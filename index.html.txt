@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#11131a">
+  <title>Drum Together</title>
+  <style>
+    :root{--bg:#0d0f14;--panel:#171a22;--text:#f7f7fb;--muted:#a4a9b8;--accent:#ff5f6d;--accent2:#ffc371;--line:#2b2f3b;--ok:#59d98e}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    body{margin:0;background:radial-gradient(circle at top,#202431 0,#0d0f14 45%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100dvh}
+    main{width:min(680px,100%);margin:auto;padding:24px 16px calc(30px + env(safe-area-inset-bottom))}
+    h1{font-size:28px;margin:6px 0}.sub{color:var(--muted);margin:0 0 20px;line-height:1.6}.card{background:rgba(23,26,34,.94);border:1px solid var(--line);border-radius:20px;padding:18px;margin:14px 0;box-shadow:0 12px 34px #0005}
+    .tabs{display:grid;grid-template-columns:1fr 1fr;background:#090b10;border-radius:14px;padding:4px;margin-bottom:18px}.tab{border:0;background:transparent;color:var(--muted);padding:12px;border-radius:11px;font-weight:700;font-size:15px}.tab.active{background:var(--panel);color:white}
+    label{display:block;color:var(--muted);font-size:13px;margin:14px 0 6px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}input,select{width:100%;border:1px solid var(--line);border-radius:12px;background:#0d1016;color:white;padding:13px;font-size:16px}
+    button{font:inherit;cursor:pointer}.primary,.secondary,.danger{width:100%;border:0;border-radius:14px;padding:14px;font-weight:800;font-size:16px;margin-top:12px}.primary{color:#151515;background:linear-gradient(135deg,var(--accent),var(--accent2))}.secondary{color:white;background:#292d39}.danger{color:#ff9ba3;background:#3a2026}.primary:disabled,.secondary:disabled{opacity:.35}
+    .status{text-align:center;color:var(--muted);min-height:24px;font-variant-numeric:tabular-nums}.pad{width:min(76vw,390px);aspect-ratio:1;margin:18px auto;border:0;border-radius:50%;display:block;color:white;font-size:27px;font-weight:900;background:radial-gradient(circle at 38% 32%,#ff8993,var(--accent) 42%,#ad2634 100%);box-shadow:0 0 0 10px #ffffff0c,0 18px 42px #ff5f6d40;touch-action:manipulation;transition:transform .05s}.pad.hit{transform:scale(.93)}
+    .transport{display:grid;grid-template-columns:1fr 1fr;gap:10px}.count{font-size:54px;font-weight:900;text-align:center;height:68px}.hidden{display:none!important}.hint{font-size:13px;color:var(--muted);line-height:1.55}.filebox{position:relative;overflow:hidden}.filebox input{position:absolute;inset:0;opacity:0;cursor:pointer}.tracks{display:grid;gap:8px;margin-top:12px}.track{display:grid;grid-template-columns:38px 1fr auto;align-items:center;gap:10px;background:#10131a;padding:10px;border-radius:12px}.dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#2b2f3b}.track small{color:var(--muted)}.remove{border:0;background:transparent;color:#ff8e98;font-size:20px}.progress{height:8px;background:#0b0d12;border-radius:99px;overflow:hidden;margin:12px 0}.progress>div{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+    footer{text-align:center;color:#686e7d;font-size:12px;margin-top:22px}
+  </style>
+</head>
+<body><main>
+  <h1>🥁 Drum Together</h1>
+  <p class="sub">1人1音。別々に叩いて、あとからみんなのリズムをひとつに。</p>
+  <div class="tabs"><button class="tab active" data-page="record">自分の音を録る</button><button class="tab" data-page="mix">みんなの音を合成</button></div>
+
+  <section id="recordPage">
+    <div class="card" id="setupCard">
+      <div class="row"><div><label>テンポ（BPM）</label><input id="bpm" type="number" value="100" min="40" max="220"></div><div><label>長さ（小節）</label><select id="bars"><option>4</option><option selected>8</option><option>16</option><option>32</option></select></div></div>
+      <label>あなたの担当（1人1つ）</label><select id="instrument"></select>
+      <label>名前</label><input id="player" maxlength="20" placeholder="例：みう">
+      <button class="primary" id="ready">この音で録音する</button>
+      <p class="hint">全員が同じBPM・小節数を選びます。最初に4拍のカウントが流れ、そのあと録音が始まります。</p>
+    </div>
+    <div class="card hidden" id="recCard">
+      <div class="status" id="recStatus">準備OK</div><div class="count" id="count"></div>
+      <button class="pad" id="pad">KICK</button>
+      <div class="progress"><div id="recProgress"></div></div>
+      <div class="transport"><button class="secondary" id="start">● 録音スタート</button><button class="secondary" id="preview" disabled>▶ 自分の演奏</button></div>
+      <button class="primary" id="export" disabled>録音データを保存・共有</button><button class="danger" id="back">設定に戻る</button>
+    </div>
+  </section>
+
+  <section id="mixPage" class="hidden">
+    <div class="card">
+      <div class="filebox"><button class="primary">＋ みんなの録音データを読み込む</button><input id="files" type="file" accept=".drumbeat,application/json" multiple></div>
+      <p class="hint">受け取った「.drumbeat」ファイルをまとめて選択できます。同じ担当のデータを入れ直すと新しい方に置き換わります。</p>
+      <div class="tracks" id="tracks"></div>
+    </div>
+    <div class="card">
+      <div class="status" id="mixStatus">まだデータがありません</div><div class="progress"><div id="mixProgress"></div></div>
+      <div class="transport"><button class="secondary" id="playAll" disabled>▶ 全員で再生</button><button class="secondary" id="stopAll" disabled>■ 停止</button></div>
+      <button class="primary" id="wav" disabled>完成版をWAVで保存</button>
+    </div>
+  </section>
+  <footer>音量に注意してお楽しみください</footer>
+</main>
+<script>
+const instruments=[
+ {id:'kick',name:'バスドラム',label:'KICK',icon:'●'}, {id:'snare',name:'スネア',label:'SNARE',icon:'◎'},
+ {id:'hihat',name:'ハイハット（閉）',label:'HI-HAT',icon:'×'}, {id:'openhat',name:'ハイハット（開）',label:'OPEN HAT',icon:'✕'},
+ {id:'clap',name:'クラップ',label:'CLAP',icon:'👏'}, {id:'lowtom',name:'ロータム',label:'LOW TOM',icon:'◉'},
+ {id:'midtom',name:'ミドルタム',label:'MID TOM',icon:'◉'}, {id:'hitom',name:'ハイタム',label:'HI TOM',icon:'◉'},
+ {id:'crash',name:'クラッシュシンバル',label:'CRASH',icon:'✺'}, {id:'cowbell',name:'カウベル',label:'COWBELL',icon:'▰'}
+];
+const $=s=>document.querySelector(s), inst=id=>instruments.find(x=>x.id===id);
+let ctx, recording=false, startAt=0, timers=[], events=[], current={}, mix=new Map(), playingNodes=[], raf;
+const later=(fn,ms)=>{const id=setTimeout(fn,ms);timers.push(id);return id};
+$('#instrument').innerHTML=instruments.map((x,i)=>`<option value="${x.id}">${i+1}. ${x.name}</option>`).join('');
+function audio(){ if(!ctx)ctx=new (window.AudioContext||window.webkitAudioContext)(); if(ctx.state==='suspended')ctx.resume(); return ctx }
+function noiseBuffer(c,d=.2){const b=c.createBuffer(1,Math.ceil(c.sampleRate*d),c.sampleRate),a=b.getChannelData(0);for(let i=0;i<a.length;i++)a[i]=Math.random()*2-1;return b}
+function hit(c,id,t=c.currentTime,out=c.destination){
+  const gain=c.createGain();gain.connect(out); const osc=c.createOscillator();osc.connect(gain);
+  const exp=(p,v,at)=>p.exponentialRampToValueAtTime(Math.max(.0001,v),at);
+  if(id==='kick'){osc.type='sine';osc.frequency.setValueAtTime(150,t);exp(osc.frequency,48,t+.11);gain.gain.setValueAtTime(.95,t);exp(gain.gain,.001,t+.45);osc.start(t);osc.stop(t+.46)}
+  else if(['lowtom','midtom','hitom'].includes(id)){let f={lowtom:90,midtom:130,hitom:185}[id];osc.type='sine';osc.frequency.setValueAtTime(f*1.35,t);exp(osc.frequency,f,t+.09);gain.gain.setValueAtTime(.72,t);exp(gain.gain,.001,t+.38);osc.start(t);osc.stop(t+.4)}
+  else if(id==='cowbell'){osc.type='square';osc.frequency.value=560;gain.gain.setValueAtTime(.22,t);exp(gain.gain,.001,t+.22);osc.start(t);osc.stop(t+.23);let o2=c.createOscillator();o2.type='square';o2.frequency.value=845;o2.connect(gain);o2.start(t);o2.stop(t+.2)}
+  else {osc.disconnect();const src=c.createBufferSource();src.buffer=noiseBuffer(c,id==='crash'?1.4:.35);const filter=c.createBiquadFilter();filter.type=id==='snare'||id==='clap'?'bandpass':'highpass';filter.frequency.value=id==='snare'?1800:id==='clap'?1200:6500;src.connect(filter);filter.connect(gain);let d={snare:.28,hihat:.08,openhat:.55,clap:.22,crash:1.25}[id]||.2;gain.gain.setValueAtTime(id==='crash'?.48:.4,t);exp(gain.gain,.001,t+d);src.start(t);src.stop(t+d+.02)}
+  playingNodes.push(gain);return gain;
+}
+function click(t,strong=false){const c=audio(),o=c.createOscillator(),g=c.createGain();o.frequency.value=strong?1200:850;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.18,t);g.gain.exponentialRampToValueAtTime(.001,t+.06);o.start(t);o.stop(t+.07)}
+function tap(){const c=audio();hit(c,current.instrument||$('#instrument').value);if(recording){let at=c.currentTime-startAt;if(at>=0)events.push(+at.toFixed(4))}const p=$('#pad');p.classList.add('hit');setTimeout(()=>p.classList.remove('hit'),65)}
+$('#pad').addEventListener('pointerdown',e=>{e.preventDefault();tap()});
+$('.tabs').addEventListener('click',e=>{if(!e.target.dataset.page)return;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===e.target));$('#recordPage').classList.toggle('hidden',e.target.dataset.page!=='record');$('#mixPage').classList.toggle('hidden',e.target.dataset.page!=='mix');stop()});
+$('#ready').onclick=()=>{current={bpm:+$('#bpm').value,bars:+$('#bars').value,instrument:$('#instrument').value,player:$('#player').value.trim()||'ななし'};if(current.bpm<40||current.bpm>220)return alert('BPMは40〜220にしてね');let i=inst(current.instrument);$('#pad').textContent=i.label;$('#setupCard').classList.add('hidden');$('#recCard').classList.remove('hidden');events=[];setRecButtons(false)};
+$('#back').onclick=()=>{stop();$('#recCard').classList.add('hidden');$('#setupCard').classList.remove('hidden')};
+function setRecButtons(done){$('#preview').disabled=!done;$('#export').disabled=!done;$('#start').disabled=recording}
+$('#start').onclick=()=>{
+  stop();const c=audio(),beat=60/current.bpm,now=c.currentTime+.12;events=[];recording=false;setRecButtons(false);$('#recStatus').textContent='4拍カウント';
+  for(let i=0;i<4;i++){click(now+i*beat,i===0);later(()=>$('#count').textContent=String(i+1),Math.max(0,(now-c.currentTime+i*beat)*1000))}
+  startAt=now+4*beat;const duration=current.bars*4*beat;
+  later(()=>{recording=true;$('#count').textContent='GO!';$('#recStatus').textContent='録音中… 叩いて！';later(()=>$('#count').textContent='',450);animate($('#recProgress'),duration)},Math.max(0,(startAt-c.currentTime)*1000));
+  later(()=>{recording=false;$('#recStatus').textContent=`録音完了：${events.length}回`;setRecButtons(true)},Math.max(0,(startAt-c.currentTime+duration)*1000));
+};
+function schedule(data,offset=.08){const c=audio(),base=c.currentTime+offset;data.events.forEach(t=>hit(c,data.instrument,base+t));return {base,duration:data.bars*4*60/data.bpm}}
+$('#preview').onclick=()=>{stop();let x={...current,events};let p=schedule(x);$('#recStatus').textContent='再生中';animate($('#recProgress'),p.duration,()=>$('#recStatus').textContent=`録音完了：${events.length}回`)};
+function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
+$('#export').onclick=()=>{let data={app:'drum-together',version:1,...current,events,created:new Date().toISOString()};let safe=current.player.replace(/[^\p{L}\p{N}_-]/gu,'_');download(new Blob([JSON.stringify(data)],{type:'application/json'}),`${safe}_${current.instrument}.drumbeat`)};
+$('#files').onchange=async e=>{for(const f of e.target.files){try{let d=JSON.parse(await f.text());if(d.app!=='drum-together'||!inst(d.instrument)||!Array.isArray(d.events))throw 0;let first=[...mix.values()][0];if(first&&(first.bpm!==d.bpm||first.bars!==d.bars)){alert(`${f.name} はBPMまたは小節数が違うため追加できません`);continue}mix.set(d.instrument,d)}catch{alert(`${f.name} はこのアプリの録音データではありません`)}}e.target.value='';renderTracks()};
+function renderTracks(){let box=$('#tracks');box.innerHTML=[...mix.values()].map(d=>{let x=inst(d.instrument);return `<div class="track"><div class="dot">${x.icon}</div><div><b>${x.name}</b><br><small>${d.player}・${d.events.length}回</small></div><button class="remove" data-id="${d.instrument}">×</button></div>`}).join('');let n=mix.size;$('#mixStatus').textContent=n?`${n}/10人分・BPM ${[...mix.values()][0].bpm}`:'まだデータがありません';$('#playAll').disabled=!n;$('#wav').disabled=!n;box.querySelectorAll('.remove').forEach(b=>b.onclick=()=>{mix.delete(b.dataset.id);renderTracks()})}
+function animate(el,duration,done){cancelAnimationFrame(raf);let st=performance.now();const go=n=>{let p=Math.min(1,(n-st)/(duration*1000));el.style.width=p*100+'%';if(p<1)raf=requestAnimationFrame(go);else done&&done()};raf=requestAnimationFrame(go)}
+function stop(){recording=false;timers.forEach(clearTimeout);timers=[];cancelAnimationFrame(raf);playingNodes.forEach(n=>{try{n.disconnect()}catch{}});playingNodes=[];$('#stopAll').disabled=true;$('#mixProgress').style.width='0%'}
+$('#playAll').onclick=()=>{stop();let all=[...mix.values()],c=audio(),base=c.currentTime+.08,d=all[0].bars*4*60/all[0].bpm;all.forEach(x=>x.events.forEach(t=>hit(c,x.instrument,base+t)));$('#stopAll').disabled=false;$('#mixStatus').textContent='全員で再生中！';animate($('#mixProgress'),d,()=>{$('#mixStatus').textContent=`${mix.size}/10人分・再生完了`;$('#stopAll').disabled=true})};
+$('#stopAll').onclick=()=>{stop();renderTracks()};
+$('#wav').onclick=async()=>{
+  let all=[...mix.values()],first=all[0],duration=first.bars*4*60/first.bpm+.8,sr=44100,off=new OfflineAudioContext(2,Math.ceil(duration*sr),sr);
+  all.forEach(x=>x.events.forEach(t=>hit(off,x.instrument,t+.05,off.destination)));$('#mixStatus').textContent='WAVを書き出し中…';let b=await off.startRendering();download(audioBufferToWav(b),'drum-together-complete.wav');$('#mixStatus').textContent='完成版を保存しました！';
+};
+function audioBufferToWav(b){let len=b.length,ch=b.numberOfChannels,ab=new ArrayBuffer(44+len*ch*2),v=new DataView(ab),p=0;const s=x=>{for(let i=0;i<x.length;i++)v.setUint8(p++,x.charCodeAt(i))};s('RIFF');v.setUint32(p,36+len*ch*2,true);p+=4;s('WAVEfmt ');v.setUint32(p,16,true);p+=4;v.setUint16(p,1,true);p+=2;v.setUint16(p,ch,true);p+=2;v.setUint32(p,b.sampleRate,true);p+=4;v.setUint32(p,b.sampleRate*ch*2,true);p+=4;v.setUint16(p,ch*2,true);p+=2;v.setUint16(p,16,true);p+=2;s('data');v.setUint32(p,len*ch*2,true);p+=4;let cs=Array.from({length:ch},(_,i)=>b.getChannelData(i));for(let i=0;i<len;i++)for(let c=0;c<ch;c++){let x=Math.max(-1,Math.min(1,cs[c][i]));v.setInt16(p,x<0?x*32768:x*32767,true);p+=2}return new Blob([ab],{type:'audio/wav'})}
+</script></body></html>
